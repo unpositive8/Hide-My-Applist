@@ -2,10 +2,11 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
     repositories {
-        maven("https://maven.aliyun.com/repository/public")
-        gradlePluginPortal()
         google()
+        gradlePluginPortal()
         mavenCentral()
+        maven("https://maven.aliyun.com/repository/public")
+        
     }
 }
 
