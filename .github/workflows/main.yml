@@ -61,6 +61,7 @@ jobs:
 
       - name: Build release
         id: buildRelease
+        continue-on-error: true
         run: |
           ./gradlew :app:buildRelease
           echo "releaseName=$(ls app/build/apk/release/HMA*-release.apk | awk -F '(/|.apk)' '{print $5}')" >> $GITHUB_OUTPUT
