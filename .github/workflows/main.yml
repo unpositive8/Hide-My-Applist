@@ -4,29 +4,20 @@ on:
   workflow_dispatch:
   push:
     branches: [ master-mod-package ]
-    paths-ignore:
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/workflows/issue.yml'
-      - '**.md'
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ ubuntu-latest ]
-    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') }}
+    name: Build Debug APK
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Gradle wrapper validation
+      - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v3
 
       - name: Set up JDK 21
@@ -43,47 +34,28 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
             
-      - name: Write key
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master-mod-package'
-        run: |
-          echo buildWithGitSuffix=true >> local.properties
-          # echo officialBuild=true >> local.properties
-          # echo storePassword='${{ secrets.KEY_STORE_PASSWORD }}' >> local.properties
-          # echo keyAlias='${{ secrets.ALIAS }}' >> local.properties
-          # echo keyPassword='${{ secrets.ALIAS_KEY_PASSWORD }}' >> local.properties
-          # echo fileDir=`pwd`/key.jks >> local.properties
-          # echo "${{ secrets.KEY_STORE }}" | base64 --decode > key.jks
-          # echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
+      - name: Configure build properties
+        run: echo "buildWithGitSuffix=true" > local.properties
 
-      - name: Cache gradle
+      - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
-          restore-keys: ${{ runner.os }}-gradle-
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: Gradle prebuild
-        run: |
-          ./gradlew prebuild
-
-      - name: Build debug
+      - name: Build Debug APK
         id: buildDebug
         run: |
-          ./gradlew :app:buildDebug
-          echo "debugName=$(ls app/build/apk/debug/HMA*-debug.apk | awk -F '(/|.apk)' '{print $5}')" >> $GITHUB_OUTPUT
+          ./gradlew :app:assembleDebug
+          echo "debugName=$(basename app/build/outputs/apk/debug/app-debug.apk .apk)" >> $GITHUB_OUTPUT
 
-      - name: Upload debug
+      - name: Upload Debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.buildDebug.outputs.debugName }}
-          path: "app/build/apk/debug/HMA*-debug.apk"
-
-      - name: Upload mappings
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mappings
-          path: "app/build/outputs/mapping/release"
+          path: app/build/outputs/apk/debug/app-debug.apk
