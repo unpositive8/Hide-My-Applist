@@ -1,23 +1,32 @@
 name: Main
 
-
-  # 当有代码推送到 master-mod-package 分支时触发
+on:
+  workflow_dispatch:
   push:
-    branches: [ master-mod-package ]
+    branches: [ master ] # 确保监听正确的分支名
+    paths-ignore:
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/workflows/issue.yml'
+      - '**.md'
 
 jobs:
   build:
-    name: Build Debug APK
-    runs-on: ubuntu-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Validate Gradle wrapper
+      - name: Gradle wrapper validation
         uses: gradle/wrapper-validation-action@v3
 
       - name: Set up JDK 21
@@ -26,36 +35,59 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # ▼▼▼ 关键修复：在正确路径下手动创建调试密钥 ▼▼▼
       - name: Create Debug Keystore
         run: |
-          mkdir -p ~/.config/.android
-          keytool -genkey -v -keystore ~/.config/.android/debug.keystore \
+          mkdir -p $HOME/.config/.android
+          keytool -genkey -v -keystore $HOME/.config/.android/debug.keystore \
             -alias androiddebugkey -storepass android -keypass android \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
             
-      - name: Configure build properties
-        run: echo "buildWithGitSuffix=true" > local.properties
+      # ▼▼▼ 关键修复：确保监听正确分支，并禁用所有自定义签名和 Google 服务 ▼▼▼
+      - name: Write key
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master-mod-package'
+        run: |
+          echo buildWithGitSuffix=true >> local.properties
+          # echo officialBuild=true >> local.properties
+          # echo storePassword='${{ secrets.KEY_STORE_PASSWORD }}' >> local.properties
+          # echo keyAlias='${{ secrets.ALIAS }}' >> local.properties
+          # echo keyPassword='${{ secrets.ALIAS_KEY_PASSWORD }}' >> local.properties
+          # echo fileDir=`pwd`/key.jks >> local.properties
+          # echo "${{ secrets.KEY_STORE }}" | base64 --decode > key.jks
+          # echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
 
-      - name: Cache Gradle packages
+      - name: Cache gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
-      - name: Build Debug APK
+      - name: Gradle prebuild
+        run: |
+          ./gradlew prebuild
+
+      # ▼▼▼ 关键修复：只构建我们需要的 Debug 版本 ▼▼▼
+      - name: Build debug
         id: buildDebug
         run: |
-          ./gradlew :app:assembleDebug
-          echo "debugName=$(basename app/build/outputs/apk/debug/app-debug.apk .apk)" >> $GITHUB_OUTPUT
+          ./gradlew :app:buildDebug
+          echo "debugName=$(ls app/build/apk/debug/HMA*-debug.apk | awk -F '(/|.apk)' '{print $5}')" >> $GITHUB_OUTPUT
 
-      - name: Upload Debug APK
+      # ▼▼▼ 关键修复：只上传 Debug 版本的产物 ▼▼▼
+      - name: Upload debug
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.buildDebug.outputs.debugName }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: "app/build/apk/debug/HMA*-debug.apk"
+
+      - name: Upload mappings
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mappings
+          path: "app/build/outputs/mapping/release"
