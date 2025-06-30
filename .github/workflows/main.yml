@@ -1,8 +1,5 @@
 name: Main
 
-on:
-  # 允许你从 Actions 页面手动触发此工作流
-  workflow_dispatch:
 
   # 当有代码推送到 master-mod-package 分支时触发
   push:
