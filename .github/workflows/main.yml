@@ -28,8 +28,8 @@ jobs:
 
       - name: Create Debug Keystore
         run: |
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore \
+          mkdir -p /home/runner/.config/.android
+          keytool -genkey -v -keystore /home/runner/.config/.android/debug.keystore \
             -alias androiddebugkey -storepass android -keypass android \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
