@@ -21,7 +21,7 @@ fun String.execute(currentWorkingDir: File = file("./")): String {
 }
 
 val gitCommitCount = "git rev-list HEAD --count".execute().toInt()
-val gitCommitHash = "git rev-parse --verify --short HEAD".execute()
+val gitCommitHash = "git rev-parse --verify --short HEAD".execute()  
 
 val minSdkVer by extra(28)
 val targetSdkVer by extra(35)
@@ -30,16 +30,18 @@ val buildToolsVer by extra("35.0.1")
 val appVerName by extra("3.5")
 val configVerCode by extra(90)
 val serviceVerCode by extra(97)
-val minBackupVerCode by extra(65)
+val minBackupVerCode by extra(65)  
 val appPackageName by extra("4.jili.04")
 
 val androidSourceCompatibility = JavaVersion.VERSION_21
-val androidTargetCompatibility = JavaVersion.VERSION_21
+val androidTargetCompatibility = JavaVersion.VERSION_21  
 
 val localProperties = Properties()
-localProperties.load(file("local.properties").inputStream())
+val localPropertiesFile = rootProject.file("local.properties") // 先获取文件对象  
+if (localPropertiesFile.exists()) { // 检查文件是否存在
+    localProperties.load(localPropertiesFile.inputStream()) // 如果存在，才加载
+}
 val officialBuild by extra(localProperties.getProperty("officialBuild", "false") == "true")
-
 tasks.register("clean", Delete::class) {
     delete(rootProject.layout.buildDirectory)
 }
